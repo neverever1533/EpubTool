@@ -1,33 +1,34 @@
 package cn.imaginary.toolkit.document.epub.mimetype;
 
 import java.io.File;
+
 import java.util.HashMap;
 import java.util.Map;
 
 public class EpubMimetypesFileTypeMap {
-    public static String File_Extension_Epub = "epub";
-    public static String File_Extension_Opf = "opf";
-    public static String File_Extension_Epub_Ncx = "ncx";
-    public static String File_Extension_Epub_Html = "html";
-    public static String File_Extension_Epub_Xhtml = "xhtml";
-    public static String File_Extension_Epub_Gif = "gif";
-    public static String File_Extension_Epub_Jpg = "jpg";
-    public static String File_Extension_Epub_Jpeg = "jpeg";
-    public static String File_Extension_Epub_Png = "png";
-    public static String File_Extension_Epub_Svg = "svg";
-    public static String File_Extension_Epub_Webp = "webp";
-    public static String File_Extension_Epub_Avif = "avif";
-    public static String File_Extension_Epub_Jxl = "jxl";
-    public static String File_Extension_Epub_Mp3 = "mp3";
-    public static String File_Extension_Epub_Mp4 = "mp4";
-    public static String File_Extension_Epub_Ogg = "ogg";
-    public static String File_Extension_Epub_Css = "css";
-    public static String File_Extension_Epub_Ttf = "ttf";
-    public static String File_Extension_Epub_Otf = "otf";
-    public static String File_Extension_Epub_Woff = "woff";
-    public static String File_Extension_Epub_Woff2 = "woff2";
-    public static String File_Extension_Epub_JavaScript = "js";
-    public static String File_Extension_Epub_Smil = "smil";
+    public static String File_Extension_Epub = ".epub";
+    public static String File_Extension_Opf = ".opf";
+    public static String File_Extension_Epub_Ncx = ".ncx";
+    public static String File_Extension_Epub_Html = ".html";
+    public static String File_Extension_Epub_Xhtml = ".xhtml";
+    public static String File_Extension_Epub_Gif = ".gif";
+    public static String File_Extension_Epub_Jpg = ".jpg";
+    public static String File_Extension_Epub_Jpeg = ".jpeg";
+    public static String File_Extension_Epub_Png = ".png";
+    public static String File_Extension_Epub_Svg = ".svg";
+    public static String File_Extension_Epub_Webp = ".webp";
+    public static String File_Extension_Epub_Avif = ".avif";
+    public static String File_Extension_Epub_Jxl = ".jxl";
+    public static String File_Extension_Epub_Mp3 = ".mp3";
+    public static String File_Extension_Epub_Mp4 = ".mp4";
+    public static String File_Extension_Epub_Ogg = ".ogg";
+    public static String File_Extension_Epub_Css = ".css";
+    public static String File_Extension_Epub_Ttf = ".ttf";
+    public static String File_Extension_Epub_Otf = ".otf";
+    public static String File_Extension_Epub_Woff = ".woff";
+    public static String File_Extension_Epub_Woff2 = ".woff2";
+    public static String File_Extension_Epub_JavaScript = ".js";
+    public static String File_Extension_Epub_Smil = ".smil";
 
     public static String Mimetype_Application = "application";
     public static String Mimetype_Image = "image";
@@ -36,6 +37,7 @@ public class EpubMimetypesFileTypeMap {
     public static String Mimetype_Video = "video";
     public static String Mimetype_Font = "font";
 
+    public static String Mimetype_Unknown = "application/octet-stream";
     public static String Mimetype_Epub = "application/epub+zip";
     public static String Mimetype_Epub_Opf = "application/oebps-package+xml";
     public static String Mimetype_Epub_Ncx = "application/x-dtbncx+xml";
@@ -107,12 +109,13 @@ public class EpubMimetypesFileTypeMap {
             String extension = null;
             int index = filePath.lastIndexOf(".");
             if (index != -1) {
-                extension = filePath.substring(index + 1).toLowerCase();
+                extension = filePath.substring(index).toLowerCase();
             }
-//            System.out.println("File extension:" + extension);
 
             if (epubMimetypesFileExtensionMap.containsKey(extension)) {
                 return epubMimetypesFileExtensionMap.get(extension);
+            } else {
+                return Mimetype_Unknown;
             }
         }
         return null;
