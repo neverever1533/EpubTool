@@ -46,9 +46,9 @@ public class Content {
     public static String Value_Version = "3.0";
     public static String Value_UID = Epub.Value_UID;
     public static String Value_Metadata_ID = Value_UID;
-    public static String Value_Manifest_Item_ID = "id";
+    public static String Value_Manifest_Item_ID = Name_Metadata_ID;
     public static String Value_Spine_Toc = Epub.Path_Toc;
-    public static String Value_Spine_Itemref_Idref = Value_Manifest_Item_ID;
+    public static String Value_Spine_Itemref_Idref = Name_Metadata_ID;
 
     public Content() {
     }
