@@ -41,13 +41,14 @@ public class Content {
     public static String Name_Manifest_Item_ID = Name_Metadata_ID;
     public static String Name_Manifest_Item_Media_Type = Epub.Name_Media_Type;
     public static String Name_Spine_Toc = "toc";
-    public static String Name_Spine_Idref = "idref";
+    public static String Name_Spine_Itemref_Idref = "idref";
 
     public static String Value_Version = "3.0";
     public static String Value_UID = Epub.Value_UID;
     public static String Value_Metadata_ID = Value_UID;
-    public static String Value_Manifest_Item_ID = "id_";
+    public static String Value_Manifest_Item_ID = "id";
     public static String Value_Spine_Toc = Epub.Path_Toc;
+    public static String Value_Spine_Itemref_Idref = Value_Manifest_Item_ID;
 
     public Content() {
     }
