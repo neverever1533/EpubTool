@@ -32,7 +32,7 @@ public class Epub {
     public static String Path_Cover_html = "cover.html";
     public static String Path_Cover_html_Default = "OEBPS/cover.html";
     public static String Path_Cover_Jpg = "cover.jpg";
-    public static String Path_Cover_Jpeg = "cover.jpe";
+    public static String Path_Cover_Jpeg = "cover.jpeg";
     public static String Path_Cover_Png = "cover.png";
     public static String Path_Mimetype = "mimetype";
 
