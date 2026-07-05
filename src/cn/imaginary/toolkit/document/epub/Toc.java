@@ -32,7 +32,7 @@ public class Toc {
     public static String Value_Head_Name_Number = "dtb:maxPageNumber";
     public static String Value_Head_Content_UID = Epub.Value_UID;
     public static String Value_Head_Content_Depth = "1";
-    public static String Value_Head_Content_Generator = Epub.Value_Rights;
+    public static String Value_Head_Content_Generator = Epub.Value_Rights_Default;
     public static String Value_Head_Content_Count = "0";
     public static String Value_Head_Content_Number = "0";
 
