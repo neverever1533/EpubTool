@@ -1,13 +1,14 @@
 package cn.imaginary.toolkit.document;
 
-import cn.imaginary.toolkit.document.epub.Content;
 import cn.imaginary.toolkit.document.epub.Container;
+import cn.imaginary.toolkit.document.epub.Content;
 import cn.imaginary.toolkit.document.epub.EpubMimetype;
-import cn.imaginary.toolkit.document.epub.Toc;
 import cn.imaginary.toolkit.document.epub.HtmlToc;
+import cn.imaginary.toolkit.document.epub.Toc;
 
 public class Epub {
-    public static String Path_Meta_Inf = "META-INF";
+    public static String Path_Package = "epubzip";
+    public static String Path_META_INF = "META-INF";
     public static String Path_OEBPS = "OEBPS";
     public static String Path_OEBPS_Pages = "pages";
     public static String Path_OEBPS_Styles = "styles";
@@ -24,29 +25,32 @@ public class Epub {
     public static String Path_Content_Default = "OEBPS/content.opf";
     public static String Path_Toc = "toc.ncx";
     public static String Path_Toc_Default = "OEBPS/toc.ncx";
+    public static String Path_XML_Content = "content.opf.xml";
+    public static String Path_XML_Toc = "toc.ncx.xml";
     public static String Path_Toc_html = "toc.html";
     public static String Path_Toc_html_Default = "OEBPS/toc.html";
-    public static String Path_Cover = "cover.png";
+    public static String Path_Cover_html = "cover.html";
+    public static String Path_Cover_html_Default = "OEBPS/cover.html";
+    public static String Path_Cover_Jpg = "cover.jpg";
+    public static String Path_Cover_Jpeg = "cover.jpe";
+    public static String Path_Cover_Png = "cover.png";
     public static String Path_Mimetype = "mimetype";
 
-    private String suffix_container = ".xml";
-    private String suffix_content = ".opf";
-    private String suffix_cover = ".jpeg";
-    private String suffix_index_split = ".html";
-    private String suffix_styles = ".css";
-    private String suffix_toc = ".ncx";
-    private String suffix_title_page = ".xhtml";
+    private String Value_Language = "zh_CN";
+    private String Value_Title = "My Book";
+    private String Value_Creator = "creator";
+    private String Value_Publisher = "publisher";
+    private String Value_Description = "My Novel";
+    private String Value_ID = "id";
+    private String Value_Rights = "rights";
+    private String Value_Data = "2026-6";
 
-    public static String Value_Language = "zh_CN";
-    public static String Value_Title = "My Book";
-    public static String Value_Creator = "creator";
-    public static String Value_Publisher = "publisher";
-    public static String Value_Description = "My Novel";
-    public static String Value_ID = "id";
-    public static String Value_Rights = "EpubTool v1.0";
-    public static String Value_Fata = "data";
+    private String Value_Cover = "cover-image";
+
+    public static String Value_Rights_Default = "EpubTool v0.2";
     public static String Value_UID = "public-id";
 
+    public static String Name_Cover = "cover";
     public static String Name_Media_Type = "media-type";
     public static String String_Null = "";
     public static String Type_Object_String = "String";
@@ -72,6 +76,25 @@ public class Epub {
         return container;
     }
 
+    public void setContent(Content content) {
+        this.content = content;
+    }
+
+    public Content getContent() {
+        if (null == content) {
+            content = new Content();
+            content.setLanguage(Value_Language);
+            content.setTitle(Value_Title);
+            content.setCreator(Value_Creator);
+            content.setPublisher(Value_Publisher);
+            content.setDescription(Value_Description);
+            content.setID(Value_ID);
+            content.setRights(Value_Rights);
+            content.setData(Value_Data);
+        }
+        return content;
+    }
+
     public void setMimetype(EpubMimetype mimetype) {
         this.mimetype = mimetype;
     }
@@ -83,15 +106,15 @@ public class Epub {
         return mimetype;
     }
 
-    public void setContent(Content content) {
-        this.content = content;
+    public void setHtmlToc(HtmlToc htmltoc) {
+        this.htmltoc = htmltoc;
     }
 
-    public Content getContent() {
-        if (null == content) {
-            content = new Content();
+    public HtmlToc getHtmlToc() {
+        if (null == htmltoc) {
+            htmltoc = new HtmlToc();
         }
-        return content;
+        return htmltoc;
     }
 
     public void setToc(Toc toc) {
@@ -103,16 +126,5 @@ public class Epub {
             toc = new Toc();
         }
         return toc;
-    }
-
-    public void setHtmlToc(HtmlToc htmltoc) {
-        this.htmltoc = htmltoc;
-    }
-
-    public HtmlToc getHtmlToc() {
-        if (null == htmltoc) {
-            htmltoc = new HtmlToc();
-        }
-        return htmltoc;
     }
 }
