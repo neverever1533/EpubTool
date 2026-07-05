@@ -4,7 +4,7 @@ import cn.imaginary.toolkit.document.Epub;
 
 public class Container {
     public static String Uri = "urn:oasis:names:tc:opendocument:xmlns:container";
-    public static String Sign = "package";
+    public static String Sign = "container";
     public static String Sign_Roots = "rootfiles";
     public static String Sign_Root = "rootfile";
     public static String Name_Path = "full-path";
