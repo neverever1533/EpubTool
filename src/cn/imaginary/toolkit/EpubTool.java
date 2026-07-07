@@ -9,6 +9,10 @@ import cn.imaginary.toolkit.document.epub.HtmlToc;
 import cn.imaginary.toolkit.document.epub.Toc;
 import cn.imaginary.toolkit.document.epub.mimetype.EpubMimetypesFileTypeMap;
 
+import javaev.io.FileTool;
+
+import javaev.util.ZipTool;
+
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.AttributesImpl;
 
@@ -66,6 +70,12 @@ public class EpubTool {
     private File[] resources_No_Pages;
 
     private Properties paths;
+
+    private int xml_container = 1;
+    private int xml_content = 2;
+    private int xml_cover = 3;
+    private int xml_toc = 4;
+    private int xml_toc_html = 5;
 
     public EpubTool() {
     }
@@ -166,7 +176,9 @@ public class EpubTool {
 
     private void loadResources(File dirFile) {
         if (null != dirFile && dirFile.exists() && dirFile.isDirectory()) {
-            resources = dirFile.listFiles();
+//            resources = dirFile.listFiles();
+            FileTool fileTool = new FileTool();
+            resources = fileTool.toArray(fileTool.listFiles(dirFile));
 
             FilenameFilter filenameFilter_Images = new FilenameFilter() {
                 @Override
@@ -178,7 +190,8 @@ public class EpubTool {
                     }
                 }
             };
-            resources_Images = dirFile.listFiles(filenameFilter_Images);
+//            resources_Images = dirFile.listFiles(filenameFilter_Images);
+            resources_Images = fileTool.toArray(fileTool.listFiles(dirFile, filenameFilter_Images));
 
             FilenameFilter filenameFilter_Pages = new FilenameFilter() {
                 @Override
@@ -190,7 +203,8 @@ public class EpubTool {
                     }
                 }
             };
-            resources_Pages = dirFile.listFiles(filenameFilter_Pages);
+//            resources_Pages = dirFile.listFiles(filenameFilter_Pages);
+            resources_Pages = fileTool.toArray(fileTool.listFiles(dirFile, filenameFilter_Pages));
 
             FilenameFilter filenameFilter_No_Pages = new FilenameFilter() {
                 @Override
@@ -202,7 +216,8 @@ public class EpubTool {
                     }
                 }
             };
-            resources_No_Pages = dirFile.listFiles(filenameFilter_No_Pages);
+//            resources_No_Pages = dirFile.listFiles(filenameFilter_No_Pages);
+            resources_No_Pages = fileTool.toArray(fileTool.listFiles(dirFile, filenameFilter_No_Pages));
         } else {
             resources = null;
         }
@@ -248,10 +263,15 @@ public class EpubTool {
             }
             File dirFile_Epub;
             if (null == file) {
-                dirFile_Epub = new File(path_Resources + Epub.Path_Package);
+                File file_Resources = new File(path_Resources);
+                dirFile_Epub = new File(file_Resources.getParentFile(), file_Resources.getName() + tag_underscore + Epub.Path_Package);
             } else {
-                File parentFile = file.getParentFile();
-                dirFile_Epub = new File(parentFile, file.getName() + Epub.Path_Package);
+                File file_parent = file.getParentFile();
+                if (file.isDirectory()) {
+                    dirFile_Epub = new File(file_parent, file.getName() + tag_underscore + Epub.Path_Package);
+                } else {
+                    dirFile_Epub = new File(file_parent, file_parent.getName() + tag_underscore + Epub.Path_Package);
+                }
             }
             if (!dirFile_Epub.exists()) {
                 dirFile_Epub.mkdir();
@@ -263,7 +283,7 @@ public class EpubTool {
             if (!dirFile_Epub_META_INF.exists()) {
                 dirFile_Epub_META_INF.mkdir();
             }
-            writeContainer(new File(dirFile_Epub_META_INF, Epub.Path_Container));
+            writeXML(new File(dirFile_Epub_META_INF, Epub.Path_Container), xml_container);
 
             File dirFile_Epub_OEBPS = new File(dirFile_Epub, Epub.Path_OEBPS);
             if (!dirFile_Epub_OEBPS.exists()) {
@@ -276,28 +296,22 @@ public class EpubTool {
             }
             File file_Cover_Html = new File(dirFile_Epub_OEBPS, Epub.Path_Cover_html);
             if (!file_Cover_Html.exists()) {
-                writeHtmlCover(file_Cover_Html);
+                writeXML(file_Cover_Html, xml_cover);
             }
             File file_Toc_Html = new File(dirFile_Epub_OEBPS, Epub.Path_Toc_html);
             if (!file_Toc_Html.exists()) {
-                writeHtmlToc(file_Toc_Html);
+                writeXML(file_Toc_Html, xml_toc_html);
             }
-//            writeContent(new File(dirFile_Epub_OEBPS, Epub.Path_XML_Content));
-//            writeToc(new File(dirFile_Epub_OEBPS, Epub.Path_XML_Toc));
-            writeContent(new File(dirFile_Epub_OEBPS, Epub.Path_Content));
-            writeToc(new File(dirFile_Epub_OEBPS, Epub.Path_Toc));
+            writeXML(new File(dirFile_Epub_OEBPS, Epub.Path_Content), xml_content);
+            writeXML(new File(dirFile_Epub_OEBPS, Epub.Path_Toc), xml_toc);
+
+            ZipTool zipTool = new ZipTool();
+            File zipFile = new File(dirFile_Epub.getParentFile(), (dirFile_Epub.getName() + EpubMimetypesFileTypeMap.File_Extension_Epub));
+            zipTool.write(dirFile_Epub, zipFile);
         }
     }
 
-    private void writeMimetype(File file) {
-        try {
-            Files.write(file.toPath(), EpubMimetype.Media_Type.getBytes(), StandardOpenOption.CREATE);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void writeContainer(File file) {
+    private void writeXML(File file, int type) {
         try {
             Result result = new StreamResult(new FileOutputStream(file));
             SAXTransformerFactory saxTransformerFactory = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
@@ -310,31 +324,54 @@ public class EpubTool {
             transformer.setOutputProperty(OutputKeys.INDENT, XML_Indent);
 
             transformerHandler.startDocument();
-            AttributesImpl attributesImpl = new AttributesImpl();
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Container.Name_Version, Epub.Type_Object_String, Container.Value_Version);
-            transformerHandler.startElement(Container.Uri, Epub.String_Null, Container.Sign, attributesImpl);
-
-            attributesImpl.clear();
-
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Container.Sign_Roots, attributesImpl);
-
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Container.Name_Path, Epub.Type_Object_String, epub.getContainer().getFullPath());
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Epub.Name_Media_Type, Epub.Type_Object_String, EpubMimetypesFileTypeMap.getContentType(epub.getContainer().getFullPath()));
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Container.Sign_Root, attributesImpl);
-
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Container.Sign_Root);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Container.Sign_Roots);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Container.Sign);
+            if (type == xml_container) {
+                writeContainer(transformerHandler);
+            } else if (type == xml_content) {
+                writeContent(transformerHandler);
+            } else if (type == xml_cover) {
+                writeHtmlCover(transformerHandler);
+            } else if (type == xml_toc) {
+                writeToc(transformerHandler);
+            } else if (type == xml_toc_html) {
+                writeHtmlToc(transformerHandler);
+            }
 
             transformerHandler.endDocument();
         } catch (FileNotFoundException | TransformerConfigurationException | SAXException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void writeMimetype(File file) {
+        try {
+            Files.write(file.toPath(), EpubMimetype.Media_Type.getBytes(), StandardOpenOption.CREATE);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void writeContainer(TransformerHandler transformerHandler) throws SAXException {
+        AttributesImpl attributesImpl = new AttributesImpl();
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Container.Name_Version, Epub.Type_Object_String, Container.Value_Version);
+        transformerHandler.startElement(Container.Uri, Epub.String_Null, Container.Sign, attributesImpl);
+
+        attributesImpl.clear();
+
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Container.Sign_Roots, attributesImpl);
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Container.Name_Path, Epub.Type_Object_String, epub.getContainer().getFullPath());
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Epub.Name_Media_Type, Epub.Type_Object_String, EpubMimetypesFileTypeMap.getContentType(epub.getContainer().getFullPath()));
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Container.Sign_Root, attributesImpl);
+
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Container.Sign_Root);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Container.Sign_Roots);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Container.Sign);
     }
 
     private void writeResource(File dirFile) throws IOException {
@@ -357,148 +394,131 @@ public class EpubTool {
         }
     }
 
-    private void writeContent(File file) {
-        try {
-            Result result = new StreamResult(new FileOutputStream(file));
-            SAXTransformerFactory saxTransformerFactory = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
-            TransformerHandler transformerHandler = saxTransformerFactory.newTransformerHandler();
-            transformerHandler.setResult(result);
-            Transformer transformer = transformerHandler.getTransformer();
+    private void writeContent(TransformerHandler transformerHandler) throws SAXException {
+        AttributesImpl attributesImpl = new AttributesImpl();
 
-            transformer.setOutputProperty(OutputKeys.VERSION, XML_Version_Default);
-            transformer.setOutputProperty(OutputKeys.ENCODING, XML_Encoding_UTF8);
-            transformer.setOutputProperty(OutputKeys.INDENT, XML_Indent);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Version, Epub.Type_Object_String, Content.Value_Version);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_UID, Epub.Type_Object_String, Content.Value_UID);
+        transformerHandler.startElement(Content.Uri, Epub.String_Null, Content.Sign, attributesImpl);
+        attributesImpl.clear();
 
-            transformerHandler.startDocument();
-            AttributesImpl attributesImpl = new AttributesImpl();
+        transformerHandler.startPrefixMapping(Content.Xmlns_Metadata_OPF, Content.Uri_Metadata_OPF);
+        transformerHandler.startPrefixMapping(Content.Xmlns_Metadata_DC, Content.Uri_Metadata_DC);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata, attributesImpl);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Version, Epub.Type_Object_String, Content.Value_Version);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_UID, Epub.Type_Object_String, Content.Value_UID);
-            transformerHandler.startElement(Content.Uri, Epub.String_Null, Content.Sign, attributesImpl);
-            attributesImpl.clear();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Language, attributesImpl);
+        transformerHandler.characters(epub.getContent().getLanguage().toCharArray(), 0, epub.getContent().getLanguage().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Language);
 
-            transformerHandler.startPrefixMapping(Content.Xmlns_Metadata_OPF, Content.Uri_Metadata_OPF);
-            transformerHandler.startPrefixMapping(Content.Xmlns_Metadata_DC, Content.Uri_Metadata_DC);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Title, attributesImpl);
+        transformerHandler.characters(epub.getContent().getTitle().toCharArray(), 0, epub.getContent().getTitle().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Title);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Language, attributesImpl);
-            transformerHandler.characters(epub.getContent().getLanguage().toCharArray(), 0, epub.getContent().getLanguage().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Language);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Creator, attributesImpl);
+        transformerHandler.characters(epub.getContent().getCreator().toCharArray(), 0, epub.getContent().getCreator().toCharArray().length);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Creator);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Title, attributesImpl);
-            transformerHandler.characters(epub.getContent().getTitle().toCharArray(), 0, epub.getContent().getTitle().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Title);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Publisher, attributesImpl);
+        transformerHandler.characters(epub.getContent().getPublisher().toCharArray(), 0, epub.getContent().getPublisher().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Publisher);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Creator, attributesImpl);
-            transformerHandler.characters(epub.getContent().getCreator().toCharArray(), 0, epub.getContent().getCreator().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Creator);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Description, attributesImpl);
+        transformerHandler.characters(epub.getContent().getDescription().toCharArray(), 0, epub.getContent().getDescription().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Description);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Publisher, attributesImpl);
-            transformerHandler.characters(epub.getContent().getPublisher().toCharArray(), 0, epub.getContent().getPublisher().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Publisher);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Metadata_ID, Epub.Type_Object_String, Content.Value_Metadata_ID);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Identifier, attributesImpl);
+        attributesImpl.clear();
+        transformerHandler.characters(epub.getContent().getID().toCharArray(), 0, epub.getContent().getID().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Identifier);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Description, attributesImpl);
-            transformerHandler.characters(epub.getContent().getDescription().toCharArray(), 0, epub.getContent().getDescription().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Description);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Rights, attributesImpl);
+        transformerHandler.characters(epub.getContent().getRights().toCharArray(), 0, epub.getContent().getRights().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Rights);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Metadata_ID, Epub.Type_Object_String, Content.Value_Metadata_ID);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Identifier, attributesImpl);
-            attributesImpl.clear();
-            transformerHandler.characters(epub.getContent().getID().toCharArray(), 0, epub.getContent().getID().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Identifier);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Data, attributesImpl);
+        transformerHandler.characters(epub.getContent().getData().toCharArray(), 0, epub.getContent().getData().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Data);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Rights, attributesImpl);
-            transformerHandler.characters(epub.getContent().getRights().toCharArray(), 0, epub.getContent().getRights().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Rights);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Data, attributesImpl);
-            transformerHandler.characters(epub.getContent().getData().toCharArray(), 0, epub.getContent().getData().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata_Data);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest, attributesImpl);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Metadata);
+        int index = 0;
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest, attributesImpl);
-
-            int index = 0;
-
-            File file_Cover_Html = getFile(resources, Epub.Path_Cover_html);
-            String name;
-            if (null != file_Cover_Html) {
-                name = file_Cover_Html.getName();
-            } else {
-                name = Epub.Path_Cover_html;
-            }
-            String path;
-            if (null != paths) {
-                path = paths.getProperty(file_Cover_Html.getAbsolutePath()) + tag_slash + name;
-            } else {
-                path = name;
-            }
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Href, Epub.Type_Object_String, path);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_ID, Epub.Type_Object_String, Content.Value_Manifest_Item_ID + tag_underscore + index);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Media_Type, Epub.Type_Object_String, EpubMimetypesFileTypeMap.getContentType(name));
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item);
-            index++;
-
-            File file_Toc_Html = getFile(resources, Epub.Path_Toc_html);
-            if (null != file_Toc_Html) {
-                name = file_Toc_Html.getName();
-            } else {
-                name = Epub.Path_Toc_html;
-            }
-            if (null != paths) {
-                path = EpubMimetypesFileTypeMap.getContentType(name) + tag_slash + name;
-            } else {
-                path = name;
-            }
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Href, Epub.Type_Object_String, path);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_ID, Epub.Type_Object_String, Content.Value_Manifest_Item_ID + tag_underscore + index);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Media_Type, Epub.Type_Object_String, EpubMimetypesFileTypeMap.getContentType(name));
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item);
-            index++;
-
-            Properties properties = new Properties();
-            index = addContentManifestItem(transformerHandler, attributesImpl, resources_No_Pages, index, properties);
-            addContentManifestItem(transformerHandler, attributesImpl, resources_Pages, index, properties);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest);
-
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Spine_Toc, Epub.Type_Object_String, Epub.Path_Toc);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine, attributesImpl);
-            attributesImpl.clear();
-
-            index = 0;
-
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Spine_Itemref_Idref, Epub.Type_Object_String, Content.Value_Spine_Itemref_Idref + tag_underscore + index);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref);
-            index++;
-
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Spine_Itemref_Idref, Epub.Type_Object_String, Content.Value_Spine_Itemref_Idref + tag_underscore + index);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref);
-            index++;
-
-            addContentSpineItem(transformerHandler, attributesImpl, resources_Pages, index, properties);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign);
-
-            transformerHandler.endDocument();
-        } catch (FileNotFoundException | TransformerConfigurationException | SAXException e) {
-            throw new RuntimeException(e);
+        File file_Cover_Html = getFile(resources, Epub.Path_Cover_html);
+        String name;
+        if (null != file_Cover_Html) {
+            name = file_Cover_Html.getName();
+        } else {
+            name = Epub.Path_Cover_html;
         }
+        String path;
+        if (null != paths && null != file_Cover_Html) {
+            path = paths.getProperty(file_Cover_Html.getAbsolutePath()) + tag_slash + name;
+        } else {
+            path = name;
+        }
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Href, Epub.Type_Object_String, path);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_ID, Epub.Type_Object_String, Content.Value_Manifest_Item_ID + tag_underscore + index);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Media_Type, Epub.Type_Object_String, EpubMimetypesFileTypeMap.getContentType(name));
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item);
+        index++;
+
+        File file_Toc_Html = getFile(resources, Epub.Path_Toc_html);
+        if (null != file_Toc_Html) {
+            name = file_Toc_Html.getName();
+        } else {
+            name = Epub.Path_Toc_html;
+        }
+        if (null != paths && null != file_Toc_Html) {
+            path = paths.getProperty(file_Toc_Html.getAbsolutePath()) + tag_slash + name;
+        } else {
+            path = name;
+        }
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Href, Epub.Type_Object_String, path);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_ID, Epub.Type_Object_String, Content.Value_Manifest_Item_ID + tag_underscore + index);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Manifest_Item_Media_Type, Epub.Type_Object_String, EpubMimetypesFileTypeMap.getContentType(name));
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest_Item);
+        index++;
+
+        Properties properties = new Properties();
+        index = addContentManifestItem(transformerHandler, attributesImpl, resources_No_Pages, index, properties);
+        addContentManifestItem(transformerHandler, attributesImpl, resources_Pages, index, properties);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Manifest);
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Spine_Toc, Epub.Type_Object_String, Epub.Path_Toc);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine, attributesImpl);
+        attributesImpl.clear();
+
+        index = 0;
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Spine_Itemref_Idref, Epub.Type_Object_String, Content.Value_Spine_Itemref_Idref + tag_underscore + index);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref);
+        index++;
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Spine_Itemref_Idref, Epub.Type_Object_String, Content.Value_Spine_Itemref_Idref + tag_underscore + index);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine_Itemref);
+        index++;
+
+        addContentSpineItem(transformerHandler, attributesImpl, resources_Pages, index, properties);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign_Spine);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Content.Sign);
     }
 
     private File getFile(File[] array, String fileName) {
@@ -567,150 +587,133 @@ public class EpubTool {
         }
     }
 
-    private void writeToc(File file) {
-        try {
-            Result result = new StreamResult(new FileOutputStream(file));
-            SAXTransformerFactory saxTransformerFactory = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
-            TransformerHandler transformerHandler = saxTransformerFactory.newTransformerHandler();
-            transformerHandler.setResult(result);
-            Transformer transformer = transformerHandler.getTransformer();
+    private void writeToc(TransformerHandler transformerHandler) throws SAXException {
+        AttributesImpl attributesImpl = new AttributesImpl();
 
-            transformer.setOutputProperty(OutputKeys.VERSION, XML_Version_Default);
-            transformer.setOutputProperty(OutputKeys.ENCODING, XML_Encoding_UTF8);
-            transformer.setOutputProperty(OutputKeys.INDENT, XML_Indent);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Version, Epub.Type_Object_String, Toc.Value_Version);
+        transformerHandler.startElement(Toc.Uri, Epub.String_Null, Toc.Sign, attributesImpl);
+        attributesImpl.clear();
 
-            transformerHandler.startDocument();
-            AttributesImpl attributesImpl = new AttributesImpl();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head, attributesImpl);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Version, Epub.Type_Object_String, Toc.Value_Version);
-            transformerHandler.startElement(Toc.Uri, Epub.String_Null, Toc.Sign, attributesImpl);
-            attributesImpl.clear();
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_UID);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_UID);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
+        attributesImpl.clear();
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head, attributesImpl);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Depth);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Depth);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
+        attributesImpl.clear();
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_UID);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_UID);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
-            attributesImpl.clear();
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Generator);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Generator);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
+        attributesImpl.clear();
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Depth);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Depth);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
-            attributesImpl.clear();
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Count);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Count);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
+        attributesImpl.clear();
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Generator);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Generator);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
-            attributesImpl.clear();
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Number);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Number);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
+        attributesImpl.clear();
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Count);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Count);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
-            attributesImpl.clear();
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Name, Epub.Type_Object_String, Toc.Value_Head_Name_Number);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Head_Content, Epub.Type_Object_String, Toc.Value_Head_Content_Number);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta, attributesImpl);
-            attributesImpl.clear();
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head_Meta);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Title, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text, attributesImpl);
+        transformerHandler.characters(epub.getContent().getTitle().toCharArray(), 0, epub.getContent().getTitle().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Title);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Head);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Author, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text, attributesImpl);
+        transformerHandler.characters(epub.getContent().getCreator().toCharArray(), 0, epub.getContent().getCreator().length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Author);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Title, attributesImpl);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text, attributesImpl);
-            transformerHandler.characters(epub.getContent().getTitle().toCharArray(), 0, epub.getContent().getTitle().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Title);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Map, attributesImpl);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Author, attributesImpl);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text, attributesImpl);
-            transformerHandler.characters(epub.getContent().getCreator().toCharArray(), 0, epub.getContent().getCreator().toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Text);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Author);
+        int index = 0;
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Map, attributesImpl);
-
-            int index = 0;
-
-            File file_Cover = getFile(resources, Epub.Path_Cover_html);
-            String name;
-            String path;
-            if (null != file_Cover) {
-                name = file_Cover.getName();
-            } else {
-                name = Epub.Path_Cover_html;
-            }
-            if (null != paths) {
-                path = paths.getProperty(file_Cover.getAbsolutePath()) + tag_slash + name;
-            } else {
-                path = name;
-            }
-            String name_prefix = getPrefix(path);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_ID, Epub.Type_Object_String, name_prefix);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Order, Epub.Type_Object_String, String.valueOf(index));
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label, attributesImpl);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text, attributesImpl);
-            transformerHandler.characters(name_prefix.toCharArray(), 0, name_prefix.toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label);
-
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Content_Src, Epub.Type_Object_String, path);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point);
-            index++;
-
-            File file_Toc_Html = getFile(resources, Epub.Path_Toc_html);
-            if (null != file_Toc_Html) {
-                name = file_Toc_Html.getName();
-            } else {
-                name = Epub.Path_Toc_html;
-            }
-            if (null != paths) {
-                path = paths.getProperty(file_Toc_Html.getAbsolutePath()) + tag_slash + name;
-            } else {
-                path = name;
-            }
-            name_prefix = getPrefix(path);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_ID, Epub.Type_Object_String, name_prefix);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Order, Epub.Type_Object_String, String.valueOf(index));
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label, attributesImpl);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text, attributesImpl);
-            transformerHandler.characters(name_prefix.toCharArray(), 0, name_prefix.toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label);
-
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Content_Src, Epub.Type_Object_String, path);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content, attributesImpl);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point);
-            index++;
-
-            addTocNavMapItem(transformerHandler, attributesImpl, resources_Pages, index);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Map);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign);
-
-            transformerHandler.endDocument();
-        } catch (FileNotFoundException | TransformerConfigurationException | SAXException e) {
-            throw new RuntimeException(e);
+        File file_Cover = getFile(resources, Epub.Path_Cover_html);
+        String name;
+        String path;
+        if (null != file_Cover) {
+            name = file_Cover.getName();
+        } else {
+            name = Epub.Path_Cover_html;
         }
+        if (null != paths && null != file_Cover) {
+            path = paths.getProperty(file_Cover.getAbsolutePath()) + tag_slash + name;
+        } else {
+            path = name;
+        }
+        String name_prefix = getPrefix(path);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_ID, Epub.Type_Object_String, name_prefix);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Order, Epub.Type_Object_String, String.valueOf(index));
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text, attributesImpl);
+        transformerHandler.characters(name_prefix.toCharArray(), 0, name_prefix.length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label);
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Content_Src, Epub.Type_Object_String, path);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point);
+        index++;
+
+        File file_Toc_Html = getFile(resources, Epub.Path_Toc_html);
+        if (null != file_Toc_Html) {
+            name = file_Toc_Html.getName();
+        } else {
+            name = Epub.Path_Toc_html;
+        }
+        if (null != paths && null != file_Toc_Html) {
+            path = paths.getProperty(file_Toc_Html.getAbsolutePath()) + tag_slash + name;
+        } else {
+            path = name;
+        }
+        name_prefix = getPrefix(path);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_ID, Epub.Type_Object_String, name_prefix);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Order, Epub.Type_Object_String, String.valueOf(index));
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text, attributesImpl);
+        transformerHandler.characters(name_prefix.toCharArray(), 0, name_prefix.length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label);
+
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Nav_Point_Content_Src, Epub.Type_Object_String, path);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content, attributesImpl);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Content);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point);
+        index++;
+
+        addTocNavMapItem(transformerHandler, attributesImpl, resources_Pages, index);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Map);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign);
     }
 
     private void addTocNavMapItem(TransformerHandler transformerHandler, AttributesImpl attributesImpl, File[] array, int index) throws SAXException {
@@ -734,7 +737,7 @@ public class EpubTool {
 
                     transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label, attributesImpl);
                     transformerHandler.startElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text, attributesImpl);
-                    transformerHandler.characters(name_prefix.toCharArray(), 0, name_prefix.toCharArray().length);
+                    transformerHandler.characters(name_prefix.toCharArray(), 0, name_prefix.length());
                     transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Text);
                     transformerHandler.endElement(Epub.String_Null, Epub.String_Null, Toc.Sign_Nav_Point_Label);
 
@@ -750,125 +753,91 @@ public class EpubTool {
         }
     }
 
-    private void writeHtmlCover(File file) {
-        try {
-            Result result = new StreamResult(new FileOutputStream(file));
-            SAXTransformerFactory saxTransformerFactory = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
-            TransformerHandler transformerHandler = saxTransformerFactory.newTransformerHandler();
-            transformerHandler.setResult(result);
-            Transformer transformer = transformerHandler.getTransformer();
+    private void writeHtmlCover(TransformerHandler transformerHandler) throws SAXException {
+        AttributesImpl attributesImpl = new AttributesImpl();
 
-            transformer.setOutputProperty(OutputKeys.VERSION, XML_Version_Default);
-            transformer.setOutputProperty(OutputKeys.ENCODING, XML_Encoding_UTF8);
-            transformer.setOutputProperty(OutputKeys.INDENT, XML_Indent);
+        transformerHandler.startElement(HtmlToc.Uri, Epub.String_Null, HtmlCover.Sign, attributesImpl);
+        attributesImpl.clear();
 
-            transformerHandler.startDocument();
-            AttributesImpl attributesImpl = new AttributesImpl();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head, attributesImpl);
 
-            transformerHandler.startElement(HtmlToc.Uri, Epub.String_Null, HtmlCover.Sign, attributesImpl);
-            attributesImpl.clear();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Title, attributesImpl);
+        transformerHandler.characters(HtmlCover.Value_Head_Title.toCharArray(), 0, HtmlCover.Value_Head_Title.length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Title);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Style, attributesImpl);
+        transformerHandler.characters(HtmlCover.Value_Head_Style.toCharArray(), 0, HtmlCover.Value_Head_Style.length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Style);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Title, attributesImpl);
-            transformerHandler.characters(HtmlCover.Value_Head_Title.toCharArray(), 0, HtmlCover.Value_Head_Title.toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Title);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Style, attributesImpl);
-            transformerHandler.characters(HtmlCover.Value_Head_Style.toCharArray(), 0, HtmlCover.Value_Head_Style.toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head_Style);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body, attributesImpl);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Head);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table, attributesImpl);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body, attributesImpl);
-
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table, attributesImpl);
-
-            File file_Cover = getFile(resources_Images, Epub.Name_Cover);
-            String name;
-            String path;
-            if (null != file_Cover) {
-                name = file_Cover.getName();
-            } else {
-                name = Epub.Path_Cover_Png;
-            }
-            if (null != paths) {
-                path = paths.getProperty(file_Cover.getAbsolutePath()) + tag_slash + name;
-            } else {
-                path = name;
-            }
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlCover.Name_Body_Table_Image_Src, Epub.Type_Object_String, path);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlCover.Name_Body_Table_Image_Alt, Epub.Type_Object_String, epub.getContent().getTitle());
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table_Image, attributesImpl);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table_Image);
-            attributesImpl.clear();
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign);
-
-            transformerHandler.endDocument();
-        } catch (FileNotFoundException | TransformerConfigurationException | SAXException e) {
-            throw new RuntimeException(e);
+        File file_Cover = getFile(resources_Images, Epub.Name_Cover);
+        String name;
+        String path;
+        if (null != file_Cover) {
+            name = file_Cover.getName();
+        } else {
+            name = Epub.Path_Cover_Png;
         }
+        if (null != paths && null != file_Cover) {
+            path = paths.getProperty(file_Cover.getAbsolutePath()) + tag_slash + name;
+        } else {
+            path = name;
+        }
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlCover.Name_Body_Table_Image_Src, Epub.Type_Object_String, path);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlCover.Name_Body_Table_Image_Alt, Epub.Type_Object_String, epub.getContent().getTitle());
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table_Image, attributesImpl);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table_Image);
+        attributesImpl.clear();
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body_Table);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign_Body);
+
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlCover.Sign);
     }
 
-    private void writeHtmlToc(File file) {
-        try {
-            Result result = new StreamResult(new FileOutputStream(file));
-            SAXTransformerFactory saxTransformerFactory = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
-            TransformerHandler transformerHandler = saxTransformerFactory.newTransformerHandler();
-            transformerHandler.setResult(result);
-            Transformer transformer = transformerHandler.getTransformer();
+    private void writeHtmlToc(TransformerHandler transformerHandler) throws SAXException {
+        AttributesImpl attributesImpl = new AttributesImpl();
 
-            transformer.setOutputProperty(OutputKeys.VERSION, XML_Version_Default);
-            transformer.setOutputProperty(OutputKeys.ENCODING, XML_Encoding_UTF8);
-            transformer.setOutputProperty(OutputKeys.INDENT, XML_Indent);
+        transformerHandler.startPrefixMapping(HtmlToc.Name_Epub, HtmlToc.Uri_Epub);
+        transformerHandler.startElement(HtmlToc.Uri, Epub.String_Null, HtmlToc.Sign, attributesImpl);
+        attributesImpl.clear();
 
-            transformerHandler.startDocument();
-            AttributesImpl attributesImpl = new AttributesImpl();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head, attributesImpl);
 
-            transformerHandler.startPrefixMapping(HtmlToc.Name_Epub, HtmlToc.Uri_Epub);
-            transformerHandler.startElement(HtmlToc.Uri, Epub.String_Null, HtmlToc.Sign, attributesImpl);
-            attributesImpl.clear();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head_Title, attributesImpl);
+        transformerHandler.characters(HtmlToc.Value_Head_Title.toCharArray(), 0, HtmlToc.Value_Head_Title.length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head_Title);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head, attributesImpl);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head_Title, attributesImpl);
-            transformerHandler.characters(HtmlToc.Value_Head_Title.toCharArray(), 0, HtmlToc.Value_Head_Title.toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head_Title);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body, attributesImpl);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Head);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlToc.Name_Body_Nav_Data_Type, Epub.Type_Object_String, HtmlToc.Value_Body_Nav_Data_Type);
+        attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlToc.Name_Body_Nav_ID, Epub.Type_Object_String, HtmlToc.Value_Body_Nav_ID);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav, attributesImpl);
+        attributesImpl.clear();
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body, attributesImpl);
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_H1, attributesImpl);
+        transformerHandler.characters(HtmlToc.Value_Body_Nav_H1.toCharArray(), 0, HtmlToc.Value_Body_Nav_H1.length());
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_H1);
 
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlToc.Name_Body_Nav_Data_Type, Epub.Type_Object_String, HtmlToc.Value_Body_Nav_Data_Type);
-            attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, HtmlToc.Name_Body_Nav_ID, Epub.Type_Object_String, HtmlToc.Value_Body_Nav_ID);
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav, attributesImpl);
-            attributesImpl.clear();
+        transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_OL, attributesImpl);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_H1, attributesImpl);
-            transformerHandler.characters(HtmlToc.Value_Body_Nav_H1.toCharArray(), 0, HtmlToc.Value_Body_Nav_H1.toCharArray().length);
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_H1);
+        addHtmlTocBodyNavItem(transformerHandler, attributesImpl, resources_Pages);
 
-            transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_OL, attributesImpl);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_OL);
 
-            addHtmlTocBodyNavItem(transformerHandler, attributesImpl, resources_Pages);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_OL);
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body);
 
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body);
-
-            transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign);
-
-            transformerHandler.endDocument();
-        } catch (FileNotFoundException | TransformerConfigurationException | SAXException e) {
-            throw new RuntimeException(e);
-        }
+        transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign);
     }
 
     private void addHtmlTocBodyNavItem(TransformerHandler transformerHandler, AttributesImpl attributesImpl, File[] array) throws SAXException {
@@ -891,7 +860,7 @@ public class EpubTool {
                     transformerHandler.startElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_A, attributesImpl);
                     attributesImpl.clear();
 
-                    transformerHandler.characters(name_Prefix.toCharArray(), 0, name_Prefix.toCharArray().length);
+                    transformerHandler.characters(name_Prefix.toCharArray(), 0, name_Prefix.length());
 
                     transformerHandler.endElement(Epub.String_Null, Epub.String_Null, HtmlToc.Sign_Body_Nav_A);
 
