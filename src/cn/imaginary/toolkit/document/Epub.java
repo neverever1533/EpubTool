@@ -89,7 +89,7 @@ public class Epub {
             content.setPublisher(Value_Publisher);
             content.setDescription(Value_Description);
             content.setID(Value_ID);
-            content.setRights(Value_Rights);
+            content.setRights(Value_Rights_Default);
             content.setData(Value_Data);
         }
         return content;
