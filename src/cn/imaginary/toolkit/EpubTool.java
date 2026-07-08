@@ -57,12 +57,10 @@ public class EpubTool {
     private String tag_slash = "/";
     private String tag_underscore = "_";
 
-    private String path_Resources;
-
     private String pattern = "yyyy-MM-dd HH:mm:ss";
     private String suffix_properties = ".ini";
 
-    private Epub epub = new Epub();
+    private Epub epub;
 
     private File[] resources;
     private File[] resources_Images;
@@ -77,6 +75,9 @@ public class EpubTool {
     private int xml_toc = 4;
     private int xml_toc_html = 5;
 
+    private File file_Epub;
+    private File file_Resource;
+
     public EpubTool() {
     }
 
@@ -85,7 +86,26 @@ public class EpubTool {
     }
 
     public Epub getEpub() {
+        if (null == epub) {
+            epub = new Epub();
+        }
         return epub;
+    }
+
+    public void setEpubFile(File file) {
+        file_Epub = file;
+    }
+
+    public File getEpubFile() {
+        return file_Epub;
+    }
+
+    public void setResourceFile(File file) {
+        file_Resource = file;
+    }
+
+    public File getResourceFile() {
+        return file_Resource;
     }
 
     public String checkData() {
@@ -121,6 +141,7 @@ public class EpubTool {
 
     private void loadInfo(Properties properties) {
         if (null != properties) {
+            Epub epub = getEpub();
             Content content = epub.getContent();
             String language = properties.getProperty(tag_language);
             String title = properties.getProperty(tag_title);
@@ -165,7 +186,7 @@ public class EpubTool {
             content.setRights(rights);
             content.setData(data);
 
-            path_Resources = properties.getProperty(tag_path);
+            String path_Resources = properties.getProperty(tag_path);
             loadResources(path_Resources);
         }
     }
@@ -176,6 +197,7 @@ public class EpubTool {
 
     private void loadResources(File dirFile) {
         if (null != dirFile && dirFile.exists() && dirFile.isDirectory()) {
+            setResourceFile(dirFile);
 //            resources = dirFile.listFiles();
             FileTool fileTool = new FileTool();
             resources = fileTool.toArray(fileTool.listFiles(dirFile));
@@ -263,7 +285,8 @@ public class EpubTool {
             }
             File dirFile_Epub;
             if (null == file) {
-                File file_Resources = new File(path_Resources);
+//                File file_Resources = new File(path_Resources);
+                File file_Resources = getResourceFile();
                 dirFile_Epub = new File(file_Resources.getParentFile(), file_Resources.getName() + tag_underscore + Epub.Path_Package);
             } else {
                 File file_parent = file.getParentFile();
@@ -276,6 +299,7 @@ public class EpubTool {
             if (!dirFile_Epub.exists()) {
                 dirFile_Epub.mkdir();
             }
+            setEpubFile(dirFile_Epub);
 
             writeMimetype(new File(dirFile_Epub, Epub.Path_Mimetype));
 
@@ -304,10 +328,17 @@ public class EpubTool {
             }
             writeXML(new File(dirFile_Epub_OEBPS, Epub.Path_Content), xml_content);
             writeXML(new File(dirFile_Epub_OEBPS, Epub.Path_Toc), xml_toc);
+        }
+    }
 
+    public void compressedEpub(File zipFile) {
+        File dirFile_Epub = getEpubFile();
+        if (null != dirFile_Epub) {
             ZipTool zipTool = new ZipTool();
-            File zipFile = new File(dirFile_Epub.getParentFile(), (dirFile_Epub.getName() + EpubMimetypesFileTypeMap.File_Extension_Epub));
-            zipTool.write(dirFile_Epub, zipFile);
+            if (null == zipFile) {
+                zipFile = new File(dirFile_Epub.getParentFile(), dirFile_Epub.getName() + EpubMimetypesFileTypeMap.File_Extension_Epub);
+            }
+            zipTool.compressed(dirFile_Epub.listFiles(), zipFile, false);
         }
     }
 
@@ -352,6 +383,7 @@ public class EpubTool {
     }
 
     private void writeContainer(TransformerHandler transformerHandler) throws SAXException {
+        Epub epub = getEpub();
         AttributesImpl attributesImpl = new AttributesImpl();
 
         attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Container.Name_Version, Epub.Type_Object_String, Container.Value_Version);
@@ -395,6 +427,7 @@ public class EpubTool {
     }
 
     private void writeContent(TransformerHandler transformerHandler) throws SAXException {
+        Epub epub = getEpub();
         AttributesImpl attributesImpl = new AttributesImpl();
 
         attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Content.Name_Version, Epub.Type_Object_String, Content.Value_Version);
@@ -588,6 +621,7 @@ public class EpubTool {
     }
 
     private void writeToc(TransformerHandler transformerHandler) throws SAXException {
+        Epub epub = getEpub();
         AttributesImpl attributesImpl = new AttributesImpl();
 
         attributesImpl.addAttribute(Epub.String_Null, Epub.String_Null, Toc.Name_Version, Epub.Type_Object_String, Toc.Value_Version);
@@ -754,6 +788,7 @@ public class EpubTool {
     }
 
     private void writeHtmlCover(TransformerHandler transformerHandler) throws SAXException {
+        Epub epub = getEpub();
         AttributesImpl attributesImpl = new AttributesImpl();
 
         transformerHandler.startElement(HtmlToc.Uri, Epub.String_Null, HtmlCover.Sign, attributesImpl);
